@@ -1,6 +1,6 @@
 import pandas as pd
 
-from testCase_prioritization.ci_cycle import CICycleLog
+from ci_cycle import CICycleLog
 
 
 class TestCaseExecutionDataLoader:

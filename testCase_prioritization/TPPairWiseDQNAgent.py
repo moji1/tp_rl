@@ -1,8 +1,7 @@
 from stable_baselines.deepq.policies import MlpPolicy
 from stable_baselines import DQN
-from testCase_prioritization.PairWiseEnv import CIPairWiseEnv
-import time
-from wrapt_timeout_decorator import *
+from PairWiseEnv import CIPairWiseEnv
+
 
 class TPPairWiseDQNAgent:
 

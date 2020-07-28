@@ -48,5 +48,5 @@ class TPPairWiseA2CAgent:
                     break
             return env.get_attr("sorted_test_cases_vector")[0]
 
-        def __test_agent(self, CIPairWiseEnv, model):
+
 

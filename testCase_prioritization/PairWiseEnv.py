@@ -4,8 +4,8 @@ import numpy as np
 import gym
 from gym import spaces
 from sklearn import preprocessing
-from testCase_prioritization.ci_cycle import CICycleLog
-from testCase_prioritization.Config import Config
+from ci_cycle import CICycleLog
+from Config import Config
 
 
 class CIPairWiseEnv(gym.Env):
@@ -68,11 +68,11 @@ class CIPairWiseEnv(gym.Env):
         if selected_test_case['verdict'] > no_selected_test_case['verdict']:
             reward = 1
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
-            reward = -1
+            reward = 0
         elif selected_test_case['avg_exec_time'] <= no_selected_test_case['avg_exec_time']:
             reward = 0.5
         elif selected_test_case['avg_exec_time'] > no_selected_test_case['avg_exec_time']:
-            reward = -0.5
+            reward = 0.1
         return reward
 
     def swapPositions(self, l, pos1, pos2):
