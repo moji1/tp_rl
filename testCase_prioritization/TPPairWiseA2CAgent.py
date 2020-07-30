@@ -3,7 +3,7 @@ from stable_baselines.common import make_vec_env
 from stable_baselines import A2C
 from stable_baselines.common.vec_env import DummyVecEnv
 
-from testCase_prioritization.PairWiseEnv import CIPairWiseEnv
+from testCase_prioritization.PairWiseEnvSelectionSort import CIPairWiseEnv
 import time
 from wrapt_timeout_decorator import *
 

@@ -16,17 +16,9 @@ class CIPairWiseEnv(gym.Env):
         self.cycle_logs = cycle_logs
         self.initial_observation = cycle_logs.test_cases.copy()
         self.test_cases_vector = self.initial_observation.copy()
-        self.test_cases_vector_temp=[]
         self.current_indexes = [0, 1]
         self.sorted_test_cases_vector = []
         self.current_obs = np.zeros((2, self.conf.win_size + 2))
-        self.width = 1
-        self.right = 1
-        self.left = 0
-        self.end = 2
-        self.index = 0
-        self.current_indexes[0] = self.index
-        self.current_indexes[1] = self.index + self.width
         self.current_obs = self.get_pair_data(self.current_indexes)
 
         # self.number_of_actions = len(self.cycle_logs.test_cases)
@@ -55,13 +47,7 @@ class CIPairWiseEnv(gym.Env):
     def reset(self):
         self.test_cases_vector = self.initial_observation.copy()
         self.current_indexes = [0, 1]
-        self.width = 1
-        self.right = 1
-        self.left = 0
-        self.end = 2
-        self.index = 0
         self.current_obs = self.get_pair_data(self.current_indexes)
-        self.test_cases_vector_temp = []
         return self.current_obs
 
     def _next_observation(self, index):
@@ -94,58 +80,20 @@ class CIPairWiseEnv(gym.Env):
         return l
 
     def step(self, test_case_index):
-        reward = self._calculate_reward(test_case_index)
         done = False
+        reward = self._calculate_reward(test_case_index)
         if test_case_index == 1:
-            self.test_cases_vector_temp.append(self.test_cases_vector[self.right])
-            self.right = self.right+1
-            if self.right >= self.end:
-                while self.left < self.index+self.width:
-                    self.test_cases_vector_temp.append(self.test_cases_vector[self.left])
-                    self.left = self.left+1
-        elif test_case_index == 0:
-            self.test_cases_vector_temp.append(self.test_cases_vector[self.left])
-            self.left = self.left + 1
-            if self.left >= self.index+self.width:
-                while self.right < self.end:
-                    self.test_cases_vector_temp.append(self.test_cases_vector[self.right])
-                    self.right = self.right+1
-
-        if self.right < self.end and self.left < self.index+self.width:
-            None
-        elif self.end < len(self.test_cases_vector)-1:
-            self.index = min(self.index+self.width*2, len(self.test_cases_vector)-1)
-            self.left = self.index
-            self.right = min(self.index + self.width, len(self.test_cases_vector)-1)
-            self.end = min(self.right+self.width, len(self.test_cases_vector))
-            if self.right < self.left+self.width:
-                while self.left < self.end:
-                    self.test_cases_vector_temp.append(self.test_cases_vector[self.left])
-                    self.left = self.left+1
-                self.width = self.width * 2
-                self.test_cases_vector = self.test_cases_vector_temp.copy()
-                self.test_cases_vector_temp = []
-                self.index = 0
-                self.left = self.index
-                self.right = min(self.left + self.width, len(self.test_cases_vector) - 1)
-                self.end = min(self.right + self.width, len(self.test_cases_vector))
-        elif self.width < len(self.test_cases_vector)/2:
-            self.width = self.width*2
-            self.test_cases_vector = self.test_cases_vector_temp.copy()
-            self.test_cases_vector_temp = []
-            self.index = 0
-            self.left = self.index
-            self.right = min(self.left + self.width, len(self.test_cases_vector)-1)
-            self.end = min(self.right+self.width, len(self.test_cases_vector))
+            self.swapPositions(self.test_cases_vector, self.current_indexes[0], self.current_indexes[1])
+        if self.current_indexes[1] < (len(self.test_cases_vector) - 1):
+            self.current_indexes[1] = self.current_indexes[1] + 1
+        elif (self.current_indexes[1] == len(self.test_cases_vector) - 1) and \
+                (self.current_indexes[0] < len(self.test_cases_vector) - 2):
+            self.current_indexes[0] = self.current_indexes[0] + 1
+            self.current_indexes[1] = self.current_indexes[0] + 1
         else:
             done = True
             ## a2c reset the env when the epsiode is done, so we need to copy the result of test cases
-            self.test_cases_vector = self.test_cases_vector_temp.copy()
             self.sorted_test_cases_vector = self.test_cases_vector.copy()
-            return self.current_obs, reward, done, {}
 
-        if not done:
-            self.current_indexes[0] = self.left
-            self.current_indexes[1] = self.right
-            self.current_obs = self._next_observation(test_case_index)
+        self.current_obs = self._next_observation(test_case_index)
         return self.current_obs, reward, done, {}
