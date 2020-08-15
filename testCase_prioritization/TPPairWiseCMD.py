@@ -15,6 +15,8 @@ from CustomCallback import  CustomCallback
 from stable_baselines.bench import Monitor
 from pathlib import Path
 
+from testCase_prioritization.PointWiseEnv import CIPointWiseEnv
+
 
 def train(trial, model):
     pass
@@ -34,16 +36,20 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
     ## check for max cycle and end_cycle and set end_cycle to max if it is larger than max
     log_file = open(conf.log_file, "a")
     log_file_test_cases = open(log_dir+"/sorted_test_case.csv", "a")
-    log_file.write("timestamp,mode,algo,model_name,episodes,steps,cycle_id,winsize,test_cases,failed_test_cases, apfd, random_apfd, optimal_apfd" + os.linesep)
+    log_file.write("timestamp,mode,algo,model_name,episodes,steps,cycle_id,winsize,test_cases,failed_test_cases, apfd, nrpa, random_apfd, optimal_apfd" + os.linesep)
     first_round: bool = True
     model_save_path = None
     for i in range(start_cycle, end_cycle - 1):
-        if test_case_data[i].get_test_cases_count() < 21 or test_case_data[i].get_failed_test_cases_count() < 1:
+        if test_case_data[i].get_test_cases_count() < 6: # or test_case_data[i].get_failed_test_cases_count() < 1:
             continue
         if mode.upper() == 'PAIRWISE':
             N = test_case_data[i].get_test_cases_count()
             steps = int(episodes * ((N * (N-1))/2))
             env = CIPairWiseEnv(test_case_data[i], conf)
+        elif mode.upper() == 'POINTWISE':
+            N = test_case_data[i].get_test_cases_count()
+            steps = int(episodes) * N
+            env = CIPointWiseEnv(test_case_data[i], conf)
         print("Training agent with replaying of cycle " + str(i) + " with steps " + str(steps))
         env = Monitor(env, log_dir)
         if model_save_path:
@@ -51,7 +57,7 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
         model_save_path = model_path + "/" + mode + "_" + algo + dataset_name + "_" + str(
             start_cycle) + "_" + str(i)
         callback_class = CustomCallback(svae_path=model_save_path,
-                                        check_freq=int((N * (N-1))/2), log_dir=log_dir, verbose=1)
+                                        check_freq=int(steps/episodes), log_dir=log_dir, verbose=1)
 
         if first_round:
             tp_agent = TPAgentUtil.create_model(algo, env)
@@ -64,23 +70,32 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
         print("Training agent with replaying of cycle " + str(i) + " is finished")
 
         j = i+1
-        while (test_case_data[j].get_test_cases_count() < 21
-               or test_case_data[j].get_failed_test_cases_count() == 0) \
-                and j <= end_cycle:
+        while (test_case_data[j].get_test_cases_count() < 6)  and j < end_cycle:\
+            #or test_case_data[j].get_failed_test_cases_count() == 0) \
             j = j+1
-        if j >= end_cycle:
+        if j >= end_cycle-1:
             break
-        if mode == 'pairwise':
+        if mode.upper() == 'PAIRWISE':
             env_test = CIPairWiseEnv(test_case_data[j], conf)
+        elif mode.upper() == 'POINTWISE':
+            env_test = CIPointWiseEnv(test_case_data[j], conf)
 
         test_case_vector = TPAgentUtil.test_agent(env=env_test, algo=algo, model_path=model_save_path+".zip", mode=mode)
         test_case_id_vector = []
         for test_case in test_case_vector:
             test_case_id_vector.append(str(test_case['test_id']))
-        apfd = test_case_data[j].calc_APFD_ordered_vector(test_case_vector)
-        apfd_optimal = test_case_data[j].calc_optimal_APFD()
-        apfd_random = test_case_data[j].calc_random_APFD()
-        print("Testing agent  on cycle " + str(j) + " resulted in APFD: " + str(apfd) +
+        if test_case_data[j].get_failed_test_cases_count() != 0:
+            apfd = test_case_data[j].calc_APFD_ordered_vector(test_case_vector)
+            apfd_optimal = test_case_data[j].calc_optimal_APFD()
+            apfd_random = test_case_data[j].calc_random_APFD()
+        else:
+            apfd =0
+            apfd_optimal =0
+            apfd_random =0
+        nrpa = test_case_data[j].calc_NRPA_vector(test_case_vector)
+        print("Testing agent  on cycle " + str(j) +
+              " resulted in APFD: " + str(apfd) +
+              " , NRPA: " + str(nrpa) +
               " , optimal APFD: " + str(apfd_optimal) +
               " , random APFD: " + str(apfd_random) +
               " , # failed test cases: " + str(test_case_data[j].get_failed_test_cases_count()) +
@@ -90,7 +105,7 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
                        str(episodes) + "," + str(steps) + "," + str(j) + "," + str(conf.win_size) + "," +
                        str(test_case_data[j].get_test_cases_count()) + "," +
                        str(test_case_data[j].get_failed_test_cases_count()) + "," + str(apfd) + "," +
-                       str(apfd_random) + "," + str(apfd_optimal) + os.linesep)
+                       str(nrpa) + "," + str(apfd_random) + "," + str(apfd_optimal) + os.linesep)
         log_file_test_cases.write(datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "," + mode + "," + algo + ","
                        + Path(model_save_path).stem + "," +
                        str(episodes) + "," + str(steps) + "," + str(j) + "," + str(conf.win_size) + "," +
@@ -104,8 +119,9 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DNN debugger')
     # parser.add_argument('--traningData',help='tranind data folder',required=False)
-    parser.add_argument('-m', '--mode', help='Formalization mode ', required=True)
-    parser.add_argument('-a', '--algo', help='Formalization mode ', required=True)
+    parser.add_argument('-m', '--mode', help='[pairwise,pointwise,listwise] ', required=True)
+    parser.add_argument('-a', '--algo', help='[a2c,dqn,..]', required=True)
+    parser.add_argument('-d', '--dataset_type', help='simple, enriched', required=False, default="simple")
     parser.add_argument('-e', '--episodes', help='Training episodes ', required=True)
     parser.add_argument('-w', '--win_size', help='Windows size of the history', required=False)
     parser.add_argument('-t', '--train_data', help='Train set folder', required=True)
@@ -147,7 +163,7 @@ if __name__ == '__main__':
         conf.log_file = conf.output_path + args.mode + "_" + args.algo + "_" + \
                         conf.dataset_name + "_" + args.episodes + "_" + str(conf.win_size) + "_log.txt"
 
-test_data_loader = TestCaseExecutionDataLoader(conf.train_data, "simple1")
+test_data_loader = TestCaseExecutionDataLoader(conf.train_data, args.dataset_type)
 test_data = test_data_loader.load_data()
 ci_cycle_logs = test_data_loader.pre_process()
 ### open data

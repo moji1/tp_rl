@@ -14,12 +14,13 @@ class CIPairWiseEnv(gym.Env):
         self.conf = conf
         self.reward_range = (-1, 1)
         self.cycle_logs = cycle_logs
+        self.testcase_vector_size=self.cycle_logs.get_test_case_vector_length(cycle_logs.test_cases[0],self.conf.win_size)
         self.initial_observation = cycle_logs.test_cases.copy()
         self.test_cases_vector = self.initial_observation.copy()
         self.test_cases_vector_temp=[]
         self.current_indexes = [0, 1]
         self.sorted_test_cases_vector = []
-        self.current_obs = np.zeros((2, self.conf.win_size + 2))
+        self.current_obs = np.zeros((2, self.testcase_vector_size))
         self.width = 1
         self.right = 1
         self.left = 0
@@ -32,14 +33,17 @@ class CIPairWiseEnv(gym.Env):
         # self.number_of_actions = len(self.cycle_logs.test_cases)
         self.action_space = spaces.Discrete(2)
         self.observation_space = spaces.Box(low=0, high=1,
-                                            shape=(2, self.conf.win_size + 2))  # ID, execution time and LastResults
+                                            shape=(2, self.testcase_vector_size))  # ID, execution time and LastResults
 
     def get_test_cases_vector(self):
         return self.test_cases_vector
 
     def get_pair_data(self, current_indexes):
         i = 0
-        temp_obs = np.zeros((2, self.conf.win_size + 2))
+        test_case_vector_length = \
+            self.cycle_logs.get_test_case_vector_length(self.test_cases_vector[current_indexes[0]], self.conf.win_size)
+        temp_obs = np.zeros((2, test_case_vector_length))
+
         for test_index in current_indexes:
             temp_obs[i, :] = self.cycle_logs.export_test_case(self.test_cases_vector[test_index],
                                                            "list_avg_exec_with_failed_history",
@@ -83,10 +87,10 @@ class CIPairWiseEnv(gym.Env):
             reward = 1
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
             reward = 0
-        elif selected_test_case['avg_exec_time'] <= no_selected_test_case['avg_exec_time']:
+        elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
             reward = 0.5
-        elif selected_test_case['avg_exec_time'] > no_selected_test_case['avg_exec_time']:
-            reward = 0.1
+        elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
+            reward = 0
         return reward
 
     def swapPositions(self, l, pos1, pos2):

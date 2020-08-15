@@ -49,9 +49,9 @@ class CustomCallback(BaseCallback):
                 else:
                     self.plateau_cnt = self.plateau_cnt + 1
                     episodes = int(self.n_calls / self.check_freq)
-                    if (self.plateau_cnt >= 10) or (self.n_calls > 3000000):
-                        print("Training is stopped due to the  plateau at step " + str(self.num_timesteps), flush=True)
-                        return False
+                    #if self.plateau_cnt >= 20:
+                    #    print("Training is stopped due to the  plateau at step " + str(self.num_timesteps), flush=True)
+                    #    return False
 
 
         return True

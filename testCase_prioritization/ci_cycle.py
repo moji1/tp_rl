@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn import preprocessing
 import random
-
+import copy
 
 class CICycleLog:
     test_cases = {}
@@ -10,6 +10,20 @@ class CICycleLog:
     def __init__(self, cycle_id: int):
         self.cycle_id = cycle_id
         self.test_cases = []
+    def add_test_case_enriched(self,test_id, test_suite, last_exec_time, verdict, avg_exec_time,
+                               failure_history=[], rest_hist=[], complexity_metrics=[]):
+        test_case:dict = {}
+        test_case['test_id'] = test_id
+        test_case['test_suite'] = test_suite
+        test_case['avg_exec_time'] = avg_exec_time
+        test_case['verdict'] = verdict
+        test_case['last_exec_time'] = last_exec_time
+        if failure_history:
+            test_case['failure_history'] = failure_history.copy()
+            test_case['age'] = 0
+        test_case['complexity_metrics'] = complexity_metrics.copy()
+        test_case['other_metrics'] = rest_hist.copy()
+        self.test_cases.append(test_case)
 
     def add_test_case(self, test_id, test_suite, avg_exec_time: int, last_exec_time: int, verdict: int,
                       failure_history: list, exec_time_history: list):
@@ -62,20 +76,48 @@ class CICycleLog:
         if option == "list_avg_exec_with_failed_history":
             # assume param1 refers to the number of test cases,
             # params 2 refers to the history windows size, and param3 refers to pa
-            test_case_vector = np.zeros((win_size + 2))
+            extra_length = 2
+            if test_case['complexity_metrics']:
+                extra_length = extra_length+len(test_case['complexity_metrics'])
+            if test_case['other_metrics']:
+                extra_length = extra_length + len(test_case['other_metrics'])
+
+            test_case_vector = np.zeros((win_size + extra_length))
+            index_1 = 0
             for j in range(0, len(test_case['failure_history'])):
                 if j >= win_size:
                     break
                 test_case_vector[j] = test_case['failure_history'][j]
-            for j in range(len(test_case), win_size):
+                index_1 = index_1 +1
+            for j in range(len(test_case['failure_history']), win_size):
                 test_case_vector[j] = pad_digit
-            test_case_vector[win_size] = test_case['avg_exec_time']
-            test_case_vector[win_size + 1] = len(test_case)
+                index_1 = index_1 +1
+            if test_case['complexity_metrics']:
+                index_2 = index_1
+                for j in range(index_2, index_2+len(test_case['complexity_metrics'])):
+                    test_case_vector[j] = test_case['complexity_metrics'][j-index_2]
+                    index_1 = index_1 + 1
+            if test_case['other_metrics']:
+                index_2 = index_1
+                for j in range(index_2,  index_2+len(test_case['other_metrics'])):
+                    test_case_vector[j] = test_case['other_metrics'][j-index_2]
+                    index_1 = index_1 + 1
+
+            test_case_vector[index_1] = test_case['avg_exec_time']
+            test_case_vector[index_1+1] = test_case['age']
             #test_cases_array = preprocessing.normalize(test_cases_vector, axis=0, norm='max')
             #test_cases_array[:, 1] = preprocessing.normalize(test_cases_array[:, 1])
             return test_case_vector
         else:
             return None
+    def get_test_case_vector_length(self,test_case,win_size):
+        extra_length = 2
+        if test_case['complexity_metrics']:
+            extra_length = extra_length + len(test_case['complexity_metrics'])
+        if test_case['other_metrics']:
+            extra_length = extra_length + len(test_case['other_metrics'])
+
+        return win_size + extra_length
 
     def calc_APFD_vector_porb(self, test_case_vector_prob: list, threshold: float):
         sum_ranks: float = 0
@@ -103,6 +145,33 @@ class CICycleLog:
         if N > 0 and M > 0:
             apfd = 1 - (sum_ranks / (N * M)) + (1 / (2 * N))
         return apfd
+
+    def get_optimal_order(self):
+        optimal_order_by_verdict = copy.deepcopy(sorted(self.test_cases, key=lambda x: x['verdict'], reverse=True))
+        optimal_order = []
+        optimal_order.extend(sorted(optimal_order_by_verdict[0:self.get_failed_test_cases_count()], key=lambda x: x['last_exec_time']))
+        optimal_order.extend(sorted(optimal_order_by_verdict[self.get_failed_test_cases_count():], key=lambda x: x['last_exec_time']))
+        return optimal_order
+    def calc_RPA_vector(self, test_case_vector: list):
+        ranks = []
+        optimal_order = self.get_optimal_order()
+        i = 0
+        for test_case in test_case_vector:
+            ranks.append(self.get_test_cases_count() - optimal_order.index(test_case))
+        return self.calc_score_ranking(ranks)
+
+    def calc_NRPA_vector(self,test_case_vector: list):
+        RPA = self.calc_RPA_vector(test_case_vector)
+        ORPA = self.get_optimal_RPA(self.get_test_cases_count())
+        return RPA/ORPA
+
+    def calc_score_ranking(self, ranks: list):
+        if not ranks:
+            return 0
+        elif len(ranks) <= 1:
+            return ranks[0]
+        else:
+            return ranks[0]*len(ranks) + self.calc_score_ranking(ranks[1:])
 
     def calc_APFD(self, ordered_test_cases_id):
         sum_ranks: float = 0
@@ -179,6 +248,12 @@ class CICycleLog:
         else:
             last_exec_time_norm = 0
         return last_exec_time_norm
+
+    def get_optimal_RPA(self, n:int):
+        if n==1:
+            return 1
+        else:
+            return (n*n) + self.get_optimal_RPA(n-1)
 
     def get_test_case_verdict(self, test_case_index: int):
         return self.test_cases[test_case_index]['verdict']

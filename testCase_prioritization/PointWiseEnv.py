@@ -16,7 +16,9 @@ class CIPointWiseEnv(gym.Env):
         self.cycle_logs = cycle_logs
         self.test_cases_vector_prob = []
         self.current_index = 0
-        self.current_obs = np.zeros((1, self.conf.win_size + 2))
+        self.optimal_order= cycle_logs.get_optimal_order()
+        self.testcase_vector_size = self.cycle_logs.get_test_case_vector_length(cycle_logs.test_cases[0],self.conf.win_size)
+        self.current_obs = np.zeros((1, self.testcase_vector_size))
         self.initial_observation = self.get_point_data(self.current_index)
         self.current_obs = self.initial_observation.copy()
 
@@ -24,7 +26,7 @@ class CIPointWiseEnv(gym.Env):
         #self.action_space = spaces.discrete()
         self.action_space = spaces.Box(low=0, high=1, shape=(1, ))
         self.observation_space = spaces.Box(low=0, high=1,
-                                            shape=(1, self.conf.win_size + 2))  # ID, execution time and LastResults
+                                            shape=(1, self.testcase_vector_size))  # ID, execution time and LastResults
 
     def get_point_data(self, test_case_index):
         temp_obs = self.cycle_logs.export_test_case(self.cycle_logs.test_cases[test_case_index],
@@ -51,6 +53,13 @@ class CIPointWiseEnv(gym.Env):
 
     ## the reward function must be called before updating the observation
     def _calculate_reward(self, test_case_prob):
+        test_case_prob = test_case_prob[0]
+        optimal_rank= self.optimal_order.index(self.cycle_logs.test_cases[self.current_index])
+        normalized_optimal_rank=optimal_rank/self.cycle_logs.get_test_cases_count()
+        reward = 1 - abs(test_case_prob-normalized_optimal_rank)
+        return reward
+    def _calculate_reward_old1(self, test_case_prob):
+        test_case_prob = test_case_prob[0]
         if self.cycle_logs.test_cases[self.current_index]['verdict']:
             if test_case_prob < .80:
                 return -1 * (0.80 - test_case_prob)
@@ -72,5 +81,5 @@ class CIPointWiseEnv(gym.Env):
             self.current_obs = self._next_observation(self.current_index)
         else:
             done = True
-            self.current_obs = np.zeros(self.conf.win_size + 2)
+            self.current_obs = np.zeros(self.testcase_vector_size)
         return self.current_obs, reward, done, {}

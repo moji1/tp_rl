@@ -26,7 +26,9 @@ class TPAgentUtil:
         elif algo.upper() == "PPO2":
             from stable_baselines.common.policies import MlpPolicy
             from stable_baselines.ppo2 import PPO2
-            model = PPO2(MlpPolicy, env, verbose=1)
+            env = DummyVecEnv([lambda: env])
+            model = PPO2(MlpPolicy, env, verbose=0)
+
         elif algo.upper() == "A2C":
             from stable_baselines.common.policies import MlpPolicy
             from stable_baselines.a2c import A2C
@@ -59,11 +61,17 @@ class TPAgentUtil:
             from stable_baselines.ppo1 import PPO1
             env = DummyVecEnv([lambda: env])
             model = PPO1(MlpPolicy, env, verbose=0)
+
         elif algo.upper() == "TRPO":
             from stable_baselines.common.policies import MlpPolicy
             from stable_baselines.trpo_mpi import TRPO
             env = DummyVecEnv([lambda: env])
-            model = TRPO(MlpPolicy, env, verbose=1)
+            model = TRPO(MlpPolicy, env, verbose=0)
+        elif algo.upper() == "DDPG":
+            from stable_baselines.ddpg.policies import MlpPolicy
+            from stable_baselines import DDPG
+            env = DummyVecEnv([lambda: env])
+            model = DDPG(MlpPolicy, env, verbose=0)
 
         return model
 
@@ -107,6 +115,12 @@ class TPAgentUtil:
             model = TRPO.load(path)
             env = DummyVecEnv([lambda: env])
             model.set_env(env)
+        elif algo.upper() == "DDPG":
+            from stable_baselines.ddpg.policies import MlpPolicy
+            from stable_baselines import DDPG
+            model = DDPG.load(path)
+            env = DummyVecEnv([lambda: env])
+            model.set_env(env)
         else:
             return None
         return model
@@ -137,7 +151,30 @@ class TPAgentUtil:
                     if done:
                         break
                 return env.sorted_test_cases_vector
-            elif mode.upper() == "LISTWISE":
+            elif mode.upper() == "POINTWISE":
+                if model:
+                    test_cases = env.cycle_logs.test_cases
+                    env = DummyVecEnv([lambda: env])
+                    model.set_env(env)
+                    obs = env.reset()
+                    done = False
+                    index = 0
+                    test_cases_vector_prob = []
+                    for index in range(0, len(test_cases)):
+                        action, _states = model.predict(obs, deterministic=False)
+                        print(action)
+                        obs, rewards, done, info = env.step(action)
+                        test_cases_vector_prob.append({'index': index, 'prob': action})
+                        if done:
+                            assert len(test_cases) == index + 1, "Evaluation is finished without iterating all " \
+                                                                 "test cases "
+                            break
+                    test_cases_vector_prob = sorted(test_cases_vector_prob, key=lambda x: x['prob'],
+                                                    reverse=False) ## the lower the rank, te higher the priority
+                    sorted_test_cases = []
+                    for test_case in test_cases_vector_prob:
+                        sorted_test_cases.append(test_cases[test_case['index']])
+                return sorted_test_cases
                 pass
             elif mode.upper() == "POINTWISE":
                 pass
