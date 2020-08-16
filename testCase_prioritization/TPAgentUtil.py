@@ -28,6 +28,11 @@ class TPAgentUtil:
             from stable_baselines.ppo2 import PPO2
             env = DummyVecEnv([lambda: env])
             model = PPO2(MlpPolicy, env, verbose=0)
+        elif algo.upper() == "TD3":
+            from stable_baselines import TD3
+            from stable_baselines.td3.policies import MlpPolicy
+            env = DummyVecEnv([lambda: env])
+            model = TD3(MlpPolicy, env, verbose=0)
 
         elif algo.upper() == "A2C":
             from stable_baselines.common.policies import MlpPolicy
@@ -72,6 +77,11 @@ class TPAgentUtil:
             from stable_baselines import DDPG
             env = DummyVecEnv([lambda: env])
             model = DDPG(MlpPolicy, env, verbose=0)
+        elif algo.upper() == "SAC":
+            from stable_baselines.sac.policies import MlpPolicy
+            from stable_baselines import SAC
+            env = DummyVecEnv([lambda: env])
+            model = SAC(MlpPolicy, env, verbose=0)
 
         return model
 
@@ -121,6 +131,18 @@ class TPAgentUtil:
             model = DDPG.load(path)
             env = DummyVecEnv([lambda: env])
             model.set_env(env)
+        elif algo.upper() == "TD3":
+            from stable_baselines import TD3
+            from stable_baselines.td3.policies import MlpPolicy
+            model = TD3(MlpPolicy, env, verbose=0)
+            env = DummyVecEnv([lambda: env])
+            model.set_env(env)
+        elif algo.upper() == "SAC":
+            from stable_baselines.sac.policies import MlpPolicy
+            from stable_baselines import SAC
+            model = SAC(MlpPolicy, env, verbose=0)
+            env = DummyVecEnv([lambda: env])
+            model.set_env(env)
         else:
             return None
         return model
@@ -154,15 +176,16 @@ class TPAgentUtil:
             elif mode.upper() == "POINTWISE":
                 if model:
                     test_cases = env.cycle_logs.test_cases
-                    env = DummyVecEnv([lambda: env])
+                    if algo.upper() != "DQN":
+                        env = DummyVecEnv([lambda: env])
                     model.set_env(env)
                     obs = env.reset()
                     done = False
                     index = 0
                     test_cases_vector_prob = []
                     for index in range(0, len(test_cases)):
-                        action, _states = model.predict(obs, deterministic=False)
-                        print(action)
+                        action, _states = model.predict(obs, deterministic=True)
+                        #print(action)
                         obs, rewards, done, info = env.step(action)
                         test_cases_vector_prob.append({'index': index, 'prob': action})
                         if done:
@@ -176,5 +199,25 @@ class TPAgentUtil:
                         sorted_test_cases.append(test_cases[test_case['index']])
                 return sorted_test_cases
                 pass
-            elif mode.upper() == "POINTWISE":
-                pass
+            elif mode.upper() == "LISTWISE":
+                if model:
+                    test_cases = env.cycle_logs.test_cases
+                    if algo.upper() != "DQN":
+                        env = DummyVecEnv([lambda: env])
+                    model.set_env(env)
+                    obs = env.reset()
+                    done = False
+                while True:
+                    action, _states = model.predict(obs, deterministic=False)
+                    print(action)
+                    print(len(agent_actions))
+                    if agent_actions.count(action) == 0 and action < len(test_cases):
+                        agent_actions.append(action)
+                        # print(len(agent_actions))
+                    obs, rewards, done, info = env.step(action)
+                    if done:
+                        break
+                sorted_test_cases = []
+                for index in agent_actions:
+                    sorted_test_cases.append(test_cases[index])
+                return  sorted_test_cases

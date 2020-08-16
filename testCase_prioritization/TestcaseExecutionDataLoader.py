@@ -77,12 +77,14 @@ class TestCaseExecutionDataLoader:
                 cycle_rew_data = self.test_data.loc[self.test_data['Cycle'] == i]
                 for index, test_case in cycle_rew_data.iterrows():
                     ci_cycle_log.add_test_case(test_id=test_case["Id"], test_suite=test_case["Name"],
-                                               avg_exec_time=test_case["avg_exec_time"],
+                                               avg_exec_time=test_case["Duration"],
                                                last_exec_time=test_case["Duration"],
                                                verdict=test_case["Verdict"],
-                                               failure_history=test_case["LastResults"], exec_time_history=None)
-            ci_cycle_logs.append(ci_cycle_log)
-        elif self.data_format=='enriched':
+                                               failure_history=test_case["LastResults"],
+                                               cycle_id=test_case["Cycle"],
+                                               exec_time_history=None)
+                ci_cycle_logs.append(ci_cycle_log)
+        elif self.data_format == 'enriched':
             for i in range(min_cycle, max_cycle + 1):
                 ci_cycle_log = CICycleLog(i)
                 cycle_rew_data = self.test_data.loc[self.test_data['Cycle'] == i]
@@ -96,13 +98,15 @@ class TestCaseExecutionDataLoader:
                     complexity_metrics=[]
                     for metric in TestCaseExecutionDataLoader.complexity_metric_list:
                         complexity_metrics.append(test_case[metric])
-                    ci_cycle_log.add_test_case_enriched(test_id=test_case["test_class_name"], test_suite=test_case["test_class_name"],
-                                               last_exec_time=test_case["time"],
-                                               verdict=test_case["current_failures"],
-                                               avg_exec_time=test_case["time_0"],
-                                               failure_history=test_case["LastResults"],
-                                               rest_hist=rest_hist,
-                                               complexity_metrics=complexity_metrics)
+                    ci_cycle_log.add_test_case_enriched(test_id=test_case["test_class_name"],
+                                                        test_suite=test_case["test_class_name"],
+                                                        last_exec_time=test_case["time"],
+                                                        verdict=test_case["current_failures"],
+                                                        avg_exec_time=test_case["time_0"],
+                                                        failure_history=test_case["LastResults"],
+                                                        rest_hist=rest_hist,
+                                                        complexity_metrics=complexity_metrics,
+                                                        cycle_id=test_case["cycle_id"])
                 ci_cycle_logs.append(ci_cycle_log)
 
         return ci_cycle_logs

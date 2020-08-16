@@ -3,21 +3,27 @@ from typing import Any, Union
 import numpy as np
 import gym
 from gym import spaces
+from testCase_prioritization.Config import Config
 
 from testCase_prioritization.ci_cycle import CICycleLog
 
 
 class CIListWiseEnv(gym.Env):
-    def __init__(self, cycle_logs: CICycleLog, test_cases_count, win_size):
+    def __init__(self, cycle_logs: CICycleLog, conf: Config):
         super(CIListWiseEnv, self).__init__()
         self.reward_range = (-1, 1)
         self.cycle_logs = cycle_logs
         self.padding_value = -1
+        self.conf = conf
+        self.optimal_order= cycle_logs.get_optimal_order()
+        self.testcase_vector_size = self.cycle_logs.get_test_case_vector_length(cycle_logs.test_cases[0],
+                                                                                self.conf.win_size)
         self.current_obs = self.cycle_logs.export_test_cases("list_avg_exec_with_failed_history", -1,
-                                                             test_cases_count, win_size, 0)
+                                                             self.conf.max_test_cases_count, self.conf.win_size,
+                                                             self.testcase_vector_size)
         self.initial_observation = np.copy(self.current_obs)
         # self.number_of_actions = len(self.cycle_logs.test_cases)
-        self.action_space = spaces.Discrete(test_cases_count)
+        self.action_space = spaces.Discrete(conf.max_test_cases_count)
         self.observation_space = spaces.Box(low=0, high=1,
                                             shape=(self.current_obs.shape[0],
                                                    self.current_obs.shape[1]))  # ID, execution time and LastResults
@@ -58,6 +64,18 @@ class CIListWiseEnv(gym.Env):
         if test_case_index >= self.cycle_logs.get_test_cases_count() or \
                 (np.repeat(self.padding_value, self.current_obs.shape[1])
                  == self.current_obs[test_case_index]).all():
+            return 0
+        assigned_rank = len(set(self.agent_results))
+        optimal_rank = self.optimal_order.index(self.cycle_logs.test_cases[test_case_index])
+        normalized_optimal_rank = optimal_rank/self.cycle_logs.get_test_cases_count()
+        normalized_assigned_rank = assigned_rank / self.cycle_logs.get_test_cases_count()
+        reward = 1 - abs(normalized_assigned_rank-normalized_optimal_rank)
+        return reward
+
+    def _calculate_reward1(self, test_case_index):
+        if test_case_index >= self.cycle_logs.get_test_cases_count() or \
+                (np.repeat(self.padding_value, self.current_obs.shape[1])
+                 == self.current_obs[test_case_index]).all():
             return -1  ## make sure that the agent (1) does not take repeated actions and
             # (2) does not select dummy test cases that are added to make the action space are unified
         rank = len(self.agent_results) + 1
@@ -75,7 +93,7 @@ class CIListWiseEnv(gym.Env):
         done = False
         reward = self._calculate_reward(test_case_index)
         self.current_obs = self._next_observation(test_case_index)
-        if len(self.agent_results) == self.cycle_logs.get_test_cases_count():
+        if len(set(self.agent_results)) == self.cycle_logs.get_test_cases_count():
             done = True
 
         return self.current_obs, reward, done, {}

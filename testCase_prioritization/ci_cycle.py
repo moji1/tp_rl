@@ -10,7 +10,7 @@ class CICycleLog:
     def __init__(self, cycle_id: int):
         self.cycle_id = cycle_id
         self.test_cases = []
-    def add_test_case_enriched(self,test_id, test_suite, last_exec_time, verdict, avg_exec_time,
+    def add_test_case_enriched(self, cycle_id, test_id, test_suite, last_exec_time, verdict, avg_exec_time,
                                failure_history=[], rest_hist=[], complexity_metrics=[]):
         test_case:dict = {}
         test_case['test_id'] = test_id
@@ -18,6 +18,7 @@ class CICycleLog:
         test_case['avg_exec_time'] = avg_exec_time
         test_case['verdict'] = verdict
         test_case['last_exec_time'] = last_exec_time
+        test_case['cycle_id'] = cycle_id
         if failure_history:
             test_case['failure_history'] = failure_history.copy()
             test_case['age'] = 0
@@ -25,13 +26,14 @@ class CICycleLog:
         test_case['other_metrics'] = rest_hist.copy()
         self.test_cases.append(test_case)
 
-    def add_test_case(self, test_id, test_suite, avg_exec_time: int, last_exec_time: int, verdict: int,
+    def add_test_case(self,  cycle_id, test_id, test_suite, avg_exec_time: int, last_exec_time: int, verdict: int,
                       failure_history: list, exec_time_history: list):
         test_case:dict = {}
         test_case['test_id'] = test_id
         test_case['test_suite'] = test_suite
         test_case['avg_exec_time'] = avg_exec_time
         test_case['verdict'] = verdict
+        test_case['cycle_id'] = cycle_id
         test_case['last_exec_time'] = last_exec_time
         if failure_history:
             test_case['failure_history'] = failure_history
@@ -47,25 +49,18 @@ class CICycleLog:
         if self.test_cases[test_id]:
             del self.test_cases[test_id]
 
-    def export_test_cases(self, option: str, pad_digit=9, param1=0, param2=0, param3=0):
+    def export_test_cases(self, option: str, pad_digit=9, max_test_cases_count=0, winsize=4, test_case_vector_size=7):
         if option == "list_avg_exec_with_failed_history":
             # assume param1 refers to the number of test cases,
             # params 2 refers to the history windows size, and param3 refers to pa
-            test_cases_array = np.zeros((param1, param2 + 2))
+            test_cases_array = np.zeros((max_test_cases_count, test_case_vector_size))
             i = 0
             for test_case in self.test_cases:
-                for j in range(0, len(test_case['failure_history'])):
-                    if j >= param2:
-                        break
-                    test_cases_array[i][j] = test_case['failure_history'][j]
-                for j in range(len(test_case['failure_history']), param2):
-                    test_cases_array[i][j] = pad_digit
-                test_cases_array[i][param2] = test_case['avg_exec_time']
-                test_cases_array[i][param2 + 1] = len(test_case['failure_history'])
+                test_cases_array[i] = self.export_test_case(test_case,
+                                                          "list_avg_exec_with_failed_history", win_size=winsize)
                 i = i + 1
-            for i in range(len(self.test_cases), param1):
-                for j in range(0, param2 + 2):
-                    test_cases_array[i][j] = pad_digit
+            for i in range(len(self.test_cases), max_test_cases_count):
+                test_cases_array[i] = np.repeat(pad_digit, test_case_vector_size)
             test_cases_array = preprocessing.normalize(test_cases_array, axis=0, norm='max')
             #test_cases_array[:, 1] = preprocessing.normalize(test_cases_array[:, 1])
             return test_cases_array
@@ -77,9 +72,9 @@ class CICycleLog:
             # assume param1 refers to the number of test cases,
             # params 2 refers to the history windows size, and param3 refers to pa
             extra_length = 2
-            if test_case['complexity_metrics']:
+            if 'complexity_metrics' in  test_case.keys():
                 extra_length = extra_length+len(test_case['complexity_metrics'])
-            if test_case['other_metrics']:
+            if 'other_metrics' in test_case.keys():
                 extra_length = extra_length + len(test_case['other_metrics'])
 
             test_case_vector = np.zeros((win_size + extra_length))
@@ -92,12 +87,12 @@ class CICycleLog:
             for j in range(len(test_case['failure_history']), win_size):
                 test_case_vector[j] = pad_digit
                 index_1 = index_1 +1
-            if test_case['complexity_metrics']:
+            if 'complexity_metrics' in test_case.keys():
                 index_2 = index_1
                 for j in range(index_2, index_2+len(test_case['complexity_metrics'])):
                     test_case_vector[j] = test_case['complexity_metrics'][j-index_2]
                     index_1 = index_1 + 1
-            if test_case['other_metrics']:
+            if 'other_metrics' in test_case.keys():
                 index_2 = index_1
                 for j in range(index_2,  index_2+len(test_case['other_metrics'])):
                     test_case_vector[j] = test_case['other_metrics'][j-index_2]
@@ -112,9 +107,9 @@ class CICycleLog:
             return None
     def get_test_case_vector_length(self,test_case,win_size):
         extra_length = 2
-        if test_case['complexity_metrics']:
+        if 'complexity_metrics' in test_case.keys():
             extra_length = extra_length + len(test_case['complexity_metrics'])
-        if test_case['other_metrics']:
+        if 'other_metrics' in test_case.keys() :
             extra_length = extra_length + len(test_case['other_metrics'])
 
         return win_size + extra_length
