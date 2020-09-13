@@ -27,12 +27,14 @@ class CICycleLog:
         self.test_cases.append(test_case)
 
     def add_test_case(self,  cycle_id, test_id, test_suite, avg_exec_time: int, last_exec_time: int, verdict: int,
-                      failure_history: list, exec_time_history: list):
+                      failure_history: list, duration_group, time_group, exec_time_history: list):
         test_case:dict = {}
         test_case['test_id'] = test_id
         test_case['test_suite'] = test_suite
         test_case['avg_exec_time'] = avg_exec_time
         test_case['verdict'] = verdict
+        test_case['duration_group'] = duration_group
+        test_case['time_group'] = time_group
         test_case['cycle_id'] = cycle_id
         test_case['last_exec_time'] = last_exec_time
         if failure_history:
@@ -67,11 +69,11 @@ class CICycleLog:
         else:
             return None
 
-    def export_test_case(self, test_case: dict, option: str, pad_digit=9, win_size=0):
+    def export_test_case(self, test_case: dict, option: str, pad_digit=9, win_size=4):
         if option == "list_avg_exec_with_failed_history":
             # assume param1 refers to the number of test cases,
             # params 2 refers to the history windows size, and param3 refers to pa
-            extra_length = 2
+            extra_length = 4
             if 'complexity_metrics' in  test_case.keys():
                 extra_length = extra_length+len(test_case['complexity_metrics'])
             if 'other_metrics' in test_case.keys():
@@ -100,13 +102,21 @@ class CICycleLog:
 
             test_case_vector[index_1] = test_case['avg_exec_time']
             test_case_vector[index_1+1] = test_case['age']
+            if 'time_group' in test_case.keys():
+                test_case_vector[index_1 + 2] = test_case['time_group']
+            else:
+                test_case_vector[index_1 + 2] = 0
+            if 'duration_group' in test_case.keys():
+                test_case_vector[index_1 + 3] = test_case['duration_group']
+            else:
+                test_case_vector[index_1 + 3] = 0
             #test_cases_array = preprocessing.normalize(test_cases_vector, axis=0, norm='max')
             #test_cases_array[:, 1] = preprocessing.normalize(test_cases_array[:, 1])
             return test_case_vector
         else:
             return None
     def get_test_case_vector_length(self,test_case,win_size):
-        extra_length = 2
+        extra_length = 4
         if 'complexity_metrics' in test_case.keys():
             extra_length = extra_length + len(test_case['complexity_metrics'])
         if 'other_metrics' in test_case.keys() :

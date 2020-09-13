@@ -1,6 +1,7 @@
 #
 from stable_baselines.common import make_vec_env
 from stable_baselines.common.vec_env import DummyVecEnv
+import numpy as np
 
 from PairWiseEnv import CIPairWiseEnv
 
@@ -207,17 +208,37 @@ class TPAgentUtil:
                     model.set_env(env)
                     obs = env.reset()
                     done = False
-                while True:
+                i=0
+                while True and i<1000000:
+                    i=i+1
                     action, _states = model.predict(obs, deterministic=False)
-                    print(action)
-                    print(len(agent_actions))
+                    #print(action)
+                    #print(len(agent_actions))
                     if agent_actions.count(action) == 0 and action < len(test_cases):
-                        agent_actions.append(action)
+                        if isinstance(action, list) or isinstance(action, np.ndarray):
+                            agent_actions.append(action[0])
+                        else:
+                            agent_actions.append(action)
                         # print(len(agent_actions))
                     obs, rewards, done, info = env.step(action)
                     if done:
                         break
                 sorted_test_cases = []
+
                 for index in agent_actions:
                     sorted_test_cases.append(test_cases[index])
+                if ( i>= 1000000):
+                    sorted_test_cases = test_cases
                 return  sorted_test_cases
+            elif mode.upper() == "LISTWISE2":
+                if model:
+                    env = model.get_env()
+                    obs = env.reset()
+                    action, _states = model.predict(obs, deterministic=True)
+                    env.step(action)
+                    if algo.upper() != "DQN":
+                        return env.get_attr("sorted_test_cases")[0]
+                    else:
+                        return env.sorted_test_cases
+
+

@@ -4,8 +4,8 @@ import numpy as np
 import gym
 from gym import spaces
 from sklearn import preprocessing
-from testCase_prioritization.ci_cycle import CICycleLog
-from testCase_prioritization.Config import Config
+from ci_cycle import CICycleLog
+from Config import Config
 
 
 class CIPointWiseEnv(gym.Env):

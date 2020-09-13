@@ -6,7 +6,7 @@ from gym import spaces
 from sklearn import preprocessing
 from ci_cycle import CICycleLog
 from Config import Config
-
+import random
 
 class CIPairWiseEnv(gym.Env):
     def __init__(self, cycle_logs: CICycleLog, conf: Config):
@@ -14,6 +14,7 @@ class CIPairWiseEnv(gym.Env):
         self.conf = conf
         self.reward_range = (-1, 1)
         self.cycle_logs = cycle_logs
+        random.shuffle(self.cycle_logs.test_cases)
         self.testcase_vector_size=self.cycle_logs.get_test_case_vector_length(cycle_logs.test_cases[0],self.conf.win_size)
         self.initial_observation = cycle_logs.test_cases.copy()
         self.test_cases_vector = self.initial_observation.copy()
@@ -73,9 +74,13 @@ class CIPairWiseEnv(gym.Env):
         return self.current_obs
 
     def _initial_obs(self):
+        random.shuffle(self.cycle_logs)
+        self.initial_observation = self.cycle_logs.test_cases.copy()
+        self.test_cases_vector = self.initial_observation.copy()
         return self.initial_observation
 
     ## the reward function must be called before updating the observation
+    ## enriched dataset
     def _calculate_reward(self, test_case_index):
         if test_case_index == 0:
             selected_test_case = self.test_cases_vector[self.current_indexes[0]]
@@ -88,11 +93,27 @@ class CIPairWiseEnv(gym.Env):
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
             reward = 0
         elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
-            reward = 0.5
+            reward = 1
         elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
             reward = 0
         return reward
-
+    ## simple  data set
+    def _calculate_reward_simple(self, test_case_index):
+        if test_case_index == 0:
+            selected_test_case = self.test_cases_vector[self.current_indexes[0]]
+            no_selected_test_case = self.test_cases_vector[self.current_indexes[1]]
+        else:
+            selected_test_case = self.test_cases_vector[self.current_indexes[1]]
+            no_selected_test_case = self.test_cases_vector[self.current_indexes[0]]
+        if selected_test_case['verdict'] > no_selected_test_case['verdict']:
+            reward = 1
+        elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
+            reward = -1
+        elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
+            reward = 0.1
+        elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
+            reward = -0.1
+        return reward
     def swapPositions(self, l, pos1, pos2):
         l[pos1], l[pos2] = l[pos2], l[pos1]
         return l

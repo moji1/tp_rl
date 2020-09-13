@@ -98,6 +98,8 @@ class VirtualScenario(object):
 
             napfd = p - sum(detection_ranks) / (total_failure_count * self.no_testcases) + p / (2 * self.no_testcases)
             apfd  = 1 - sum(detection_ranks_all) / (total_failure_count * self.no_testcases) + 1 / (2 * self.no_testcases)
+            if (self.no_testcases<6):
+                apfd=0
             recall = detected_failures / total_failure_count
             avg_precision = 123
         else:

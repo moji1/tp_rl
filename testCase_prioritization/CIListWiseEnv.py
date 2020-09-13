@@ -3,9 +3,9 @@ from typing import Any, Union
 import numpy as np
 import gym
 from gym import spaces
-from testCase_prioritization.Config import Config
+from Config import Config
 
-from testCase_prioritization.ci_cycle import CICycleLog
+from ci_cycle import CICycleLog
 
 
 class CIListWiseEnv(gym.Env):

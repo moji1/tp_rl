@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime
+from statistics import mean
 
 
 from TPAgentUtil import TPAgentUtil
@@ -14,10 +15,10 @@ from TestcaseExecutionDataLoader import TestCaseExecutionDataLoader
 from CustomCallback import  CustomCallback
 from stable_baselines.bench import Monitor
 from pathlib import Path
-
-from testCase_prioritization.CIListWiseEnv import CIListWiseEnv
-from testCase_prioritization.PointWiseEnv import CIPointWiseEnv
-
+from CIListWiseEnvMultiAction import CIListWiseEnvMultiAction
+from CIListWiseEnv import CIListWiseEnv
+from PointWiseEnv import CIPointWiseEnv
+import sys
 
 def train(trial, model):
     pass
@@ -58,8 +59,10 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
     log_file.write("timestamp,mode,algo,model_name,episodes,steps,cycle_id,training_time,testing_time,winsize,test_cases,failed_test_cases, apfd, nrpa, random_apfd, optimal_apfd" + os.linesep)
     first_round: bool = True
     model_save_path = None
+    apfds=[]
+    nrpas=[]
     for i in range(start_cycle, end_cycle - 1):
-        if test_case_data[i].get_test_cases_count() < 6: # or test_case_data[i].get_failed_test_cases_count() < 1:
+        if test_case_data[i].get_test_cases_count() < 6: #or test_case_data[i].get_failed_test_cases_count() < 1:
             continue
         if mode.upper() == 'PAIRWISE':
             N = test_case_data[i].get_test_cases_count()
@@ -74,6 +77,11 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
             N = test_case_data[i].get_test_cases_count()
             steps = int(episodes) * get_max_test_cases_count(test_case_data)
             env = CIListWiseEnv(test_case_data[i], conf)
+        elif mode.upper() == 'LISTWISE2':
+            conf.max_test_cases_count = get_max_test_cases_count(test_case_data)
+            N = test_case_data[i].get_test_cases_count()
+            steps = int(episodes) * get_max_test_cases_count(test_case_data)
+            env = CIListWiseEnvMultiAction(test_case_data[i], conf)
         print("Training agent with replaying of cycle " + str(i) + " with steps " + str(steps))
 
         if model_save_path:
@@ -83,6 +91,7 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
         env = Monitor(env, model_save_path +"_monitor.csv")
         callback_class = CustomCallback(svae_path=model_save_path,
                                         check_freq=int(steps/episodes), log_dir=log_dir, verbose=verbos)
+
 
         if first_round:
             tp_agent = TPAgentUtil.create_model(algo, env)
@@ -98,7 +107,7 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
         print("Training agent with replaying of cycle " + str(i) + " is finished")
 
         j = i+1
-        while (test_case_data[j].get_test_cases_count() < 6)  and j < end_cycle:\
+        while (test_case_data[j].get_test_cases_count() < 6 )  and j < end_cycle:
             #or test_case_data[j].get_failed_test_cases_count() == 0) \
             j = j+1
         if j >= end_cycle-1:
@@ -109,6 +118,8 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
             env_test = CIPointWiseEnv(test_case_data[j], conf)
         elif mode.upper() == 'LISTWISE':
             env_test = CIListWiseEnv(test_case_data[j], conf)
+        elif mode.upper() == 'LISTWISE2':
+            env_test = CIListWiseEnvMultiAction(test_case_data[j], conf)
 
         test_time_start = datetime.now()
         test_case_vector = TPAgentUtil.test_agent(env=env_test, algo=algo, model_path=model_save_path+".zip", mode=mode)
@@ -122,11 +133,13 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
             apfd = test_case_data[j].calc_APFD_ordered_vector(test_case_vector)
             apfd_optimal = test_case_data[j].calc_optimal_APFD()
             apfd_random = test_case_data[j].calc_random_APFD()
+            apfds.append(apfd)
         else:
             apfd =0
             apfd_optimal =0
             apfd_random =0
         nrpa = test_case_data[j].calc_NRPA_vector(test_case_vector)
+        nrpas.append(nrpa)
         test_time = millis_interval(test_time_start,test_time_end)
         training_time = millis_interval(training_start_time,training_end_time)
         print("Testing agent  on cycle " + str(j) +
@@ -148,14 +161,35 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
                        str(episodes) + "," + str(steps) + "," + str(cycle_id_text) + "," + str(training_time) +
                        "," + str(test_time) + "," + str(conf.win_size) + "," +
                                   ('|'.join(test_case_id_vector)) + os.linesep)
+        if (len(apfds)):
+            print(f"avrage apfd so far is {mean(apfds)}")
+        print(f"avrage nrpas so far is {mean(nrpas)}")
+
         log_file.flush()
         log_file_test_cases.flush()
     log_file.close()
     log_file_test_cases.close()
 
+def reportDatasetInfo(test_case_data:list):
+    cycle_cnt = 0
+    failed_test_case_cnt = 0
+    test_case_cnt = 0
+    failed_cycle = 0
+    for cycle in test_case_data:
+        if cycle.get_test_cases_count() > 5:
+            cycle_cnt = cycle_cnt+1
+            test_case_cnt = test_case_cnt + cycle.get_test_cases_count()
+            failed_test_case_cnt = failed_test_case_cnt+cycle.get_failed_test_cases_count()
+            if cycle.get_failed_test_cases_count() > 0:
+                failed_cycle = failed_cycle + 1
+    print(f"# of cycle: {cycle_cnt}, # of test case: {test_case_cnt}, # of failed test case: {failed_test_case_cnt}, "
+          f" failure rate:{failed_test_case_cnt/test_case_cnt}, # failed test cycle: {failed_cycle}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DNN debugger')
+    old_limit = sys.getrecursionlimit()
+    print("Recursion limit:" + str(old_limit))
+    sys.setrecursionlimit(1000000)
     # parser.add_argument('--traningData',help='tranind data folder',required=False)
     parser.add_argument('-m', '--mode', help='[pairwise,pointwise,listwise] ', required=True)
     parser.add_argument('-a', '--algo', help='[a2c,dqn,..]', required=True)
@@ -170,7 +204,7 @@ if __name__ == '__main__':
 
 
     # parser.add_argument('-f','--flags',help='Input csv file containing testing result',required=False)
-    supported_formalization = ['PAIRWISE', 'POINTWISE', 'LISTWISE']
+    supported_formalization = ['PAIRWISE', 'POINTWISE', 'LISTWISE','LISTWISE2']
     supported_algo = ['DQN', 'PPO2', "A2C", "ACKTR", "DDPG", "ACER", "GAIL", "HER", "PPO1", "SAC", "TD3", "TRPO"]
     args = parser.parse_args()
     assert supported_formalization.count(args.mode.upper()) == 1, "The formalization mode is not set correctly"
@@ -206,8 +240,9 @@ test_data = test_data_loader.load_data()
 ci_cycle_logs = test_data_loader.pre_process()
 ### open data
 
+reportDatasetInfo(test_case_data=ci_cycle_logs)
 
-# training using n cycle staring from start cycle
+#training using n cycle staring from start cycle
 experiment(mode=args.mode, algo=args.algo.upper(), test_case_data=ci_cycle_logs, episodes=int(args.episodes),
            start_cycle=conf.first_cycle, verbos=False,
            end_cycle=conf.first_cycle + conf.cycle_count - 1, model_path=conf.output_path, dataset_name="", conf=conf)

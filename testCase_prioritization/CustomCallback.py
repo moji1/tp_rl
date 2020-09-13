@@ -26,6 +26,7 @@ class CustomCallback(BaseCallback):
             os.makedirs(self.save_path, exist_ok=True)
 
     def _on_step(self) -> bool:
+        #print(self.n_calls)
         if self.n_calls % self.check_freq == 0:
             # Retrieve training reward
             x, y = ts2xy(load_results(self.log_dir), 'timesteps')
@@ -49,11 +50,9 @@ class CustomCallback(BaseCallback):
                 else:
                     self.plateau_cnt = self.plateau_cnt + 1
                     episodes = int(self.n_calls / self.check_freq)
-                    #if self.plateau_cnt >= 20:
-                    #    print("Training is stopped due to the  plateau at step " + str(self.num_timesteps), flush=True)
-                    #    return False
-
-
+                    if self.plateau_cnt>=30 or self.n_calls >= 1000000:
+                        print("Training is stopped due to the  plateau at step " + str(self.n_calls), flush=True)
+                        return False
         return True
 
     def _on_rollout_end(self) -> None:

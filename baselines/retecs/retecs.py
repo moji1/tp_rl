@@ -18,7 +18,7 @@ except:
 
 DEFAULT_NO_SCENARIOS = 1000
 DEFAULT_NO_ACTIONS = 100
-DEFAULT_HISTORY_LENGTH = 4
+DEFAULT_HISTORY_LENGTH = 10
 DEFAULT_STATE_SIZE = DEFAULT_HISTORY_LENGTH + 1
 DEFAULT_LEARNING_RATE = 0.05
 DEFAULT_EPSILON = 0.2
@@ -322,7 +322,7 @@ if __name__ == '__main__':
                         choices=['tableau', 'network', 'heur_random', 'heur_sort', 'heur_weight'], default='network')
     parser.add_argument('-sp', '--scenario-provider',
                         choices=['random', 'incremental', 'paintcontrol', 'iofrol', 'gsdtsr'], default='iofrol')
-    parser.add_argument('-r', '--reward', choices=['binary', 'failcount', 'timerank', 'tcfail'], default='tcfail')
+    parser.add_argument('-r', '--reward', choices=['binary', 'failcount', 'timerank', 'tcfail'], default='failcount')
     parser.add_argument('-p', '--prefix')
     parser.add_argument('-hist', '--histlen', type=int, default=DEFAULT_HISTORY_LENGTH)
     parser.add_argument('-eps', '--epsilon', type=float, default=DEFAULT_EPSILON)

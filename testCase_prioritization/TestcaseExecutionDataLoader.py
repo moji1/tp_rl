@@ -28,7 +28,7 @@ class TestCaseExecutionDataLoader:
         max_size = 0
         ### process last result
         if self.data_format=="simple":
-            df = pd.read_csv(self.data_path, error_bad_lines=False, sep=";")
+            df = pd.read_csv(self.data_path, error_bad_lines=False, sep=",")
             for i in range(df.shape[0]):
                 last_result_str: str = df["LastResults"][i]
                 temp_list = (last_result_str.strip("[").strip("]").split(","))
@@ -82,6 +82,8 @@ class TestCaseExecutionDataLoader:
                                                verdict=test_case["Verdict"],
                                                failure_history=test_case["LastResults"],
                                                cycle_id=test_case["Cycle"],
+                                               duration_group=test_case["DurationGroup"],
+                                               time_group=test_case["TimeGroup"],
                                                exec_time_history=None)
                 ci_cycle_logs.append(ci_cycle_log)
         elif self.data_format == 'enriched':
