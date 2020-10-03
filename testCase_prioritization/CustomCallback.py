@@ -43,16 +43,17 @@ class CustomCallback(BaseCallback):
                 if mean_reward > self.best_mean_reward:
                     self.plateau_cnt = 0
                     self.best_mean_reward = mean_reward
+                    self.model.save(self.save_path)
                     # Example for saving best model
                     if self.verbose > 0:
                         print("Saving new best model to {}".format(self.save_path))
-                    self.model.save(self.save_path)
-                else:
-                    self.plateau_cnt = self.plateau_cnt + 1
-                    episodes = int(self.n_calls / self.check_freq)
-                    if self.plateau_cnt>=30 or self.n_calls >= 1000000:
+                    else:
+                        self.plateau_cnt = self.plateau_cnt + 1
+                        episodes = int(self.n_calls / self.check_freq)
+                    if self.plateau_cnt>=50 or self.n_calls >= 1000000:
                         print("Training is stopped due to the  plateau at step " + str(self.n_calls), flush=True)
                         return False
+
         return True
 
     def _on_rollout_end(self) -> None:

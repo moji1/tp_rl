@@ -12,6 +12,7 @@ class CIPairWiseEnv(gym.Env):
     def __init__(self, cycle_logs: CICycleLog, conf: Config):
         super(CIPairWiseEnv, self).__init__()
         self.conf = conf
+        #self.db_type = conf.db_type
         self.reward_range = (-1, 1)
         self.cycle_logs = cycle_logs
         random.shuffle(self.cycle_logs.test_cases)
@@ -81,7 +82,7 @@ class CIPairWiseEnv(gym.Env):
 
     ## the reward function must be called before updating the observation
     ## enriched dataset
-    def _calculate_reward(self, test_case_index):
+    def _calculate_reward_enriched(self, test_case_index):
         if test_case_index == 0:
             selected_test_case = self.test_cases_vector[self.current_indexes[0]]
             no_selected_test_case = self.test_cases_vector[self.current_indexes[1]]
@@ -91,11 +92,11 @@ class CIPairWiseEnv(gym.Env):
         if selected_test_case['verdict'] > no_selected_test_case['verdict']:
             reward = 1
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
-            reward = 0
+            reward = -1
         elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
             reward = 1
         elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
-            reward = 0
+            reward = -1
         return reward
     ## simple  data set
     def _calculate_reward_simple(self, test_case_index):
@@ -110,21 +111,28 @@ class CIPairWiseEnv(gym.Env):
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
             reward = -1
         elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
-            reward = 0.1
+            reward = 0
         elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
-            reward = -0.1
+            reward = 0
         return reward
     def swapPositions(self, l, pos1, pos2):
         l[pos1], l[pos2] = l[pos2], l[pos1]
         return l
 
+    def _calculate_reward(self, test_case_index):
+        if self.conf.dataset_type == "simple":
+            return self._calculate_reward_simple(test_case_index)
+        elif self.conf.dataset_type == "enriched":
+            return self._calculate_reward_enriched(test_case_index)
+        else:
+            assert  False, "dataset type error"
     def step(self, test_case_index):
         reward = self._calculate_reward(test_case_index)
         done = False
         if test_case_index == 1:
             self.test_cases_vector_temp.append(self.test_cases_vector[self.right])
             self.right = self.right+1
-            if self.right >= self.end:
+            if self.right >= min(self.end,self.index+2*self.width):
                 while self.left < self.index+self.width:
                     self.test_cases_vector_temp.append(self.test_cases_vector[self.left])
                     self.left = self.left+1
@@ -132,16 +140,16 @@ class CIPairWiseEnv(gym.Env):
             self.test_cases_vector_temp.append(self.test_cases_vector[self.left])
             self.left = self.left + 1
             if self.left >= self.index+self.width:
-                while self.right < self.end:
+                while self.right < min(self.end,self.index+2*self.width):
                     self.test_cases_vector_temp.append(self.test_cases_vector[self.right])
                     self.right = self.right+1
 
-        if self.right < self.end and self.left < self.index+self.width:
+        if self.right < self.end or self.left < self.index+self.width:
             None
-        elif self.end < len(self.test_cases_vector)-1:
+        elif self.end < len(self.test_cases_vector):
             self.index = min(self.index+self.width*2, len(self.test_cases_vector)-1)
             self.left = self.index
-            self.right = min(self.index + self.width, len(self.test_cases_vector)-1)
+            self.right = min(self.left + self.width, len(self.test_cases_vector)-1)
             self.end = min(self.right+self.width, len(self.test_cases_vector))
             if self.right < self.left+self.width:
                 while self.left < self.end:
@@ -166,6 +174,7 @@ class CIPairWiseEnv(gym.Env):
             done = True
             ## a2c reset the env when the epsiode is done, so we need to copy the result of test cases
             self.test_cases_vector = self.test_cases_vector_temp.copy()
+            assert len(self.test_cases_vector) == len(self.cycle_logs.test_cases), "merge sort does not work as expected"
             self.sorted_test_cases_vector = self.test_cases_vector.copy()
             return self.current_obs, reward, done, {}
 

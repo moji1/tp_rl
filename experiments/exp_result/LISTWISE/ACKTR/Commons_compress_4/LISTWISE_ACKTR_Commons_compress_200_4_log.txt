@@ -1,0 +1,2 @@
+timestamp,mode,algo,model_name,episodes,steps,cycle_id,training_time,testing_time,winsize,test_cases,failed_test_cases, apfd, nrpa, random_apfd, optimal_apfd
+17/09/2020 18:19:14,LISTWISE,ACKTR,LISTWISE_ACKTR_0_0,200,17297,d50feb67569fb5881b8a2ff5996f656c5f207c2e,93405785.951,2318.565,4,29,0,0,0.7189947399181765,0,0

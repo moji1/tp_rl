@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import numpy as np
+import math
 import os
 from datetime import datetime
 from statistics import mean
@@ -51,6 +52,7 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
         os.makedirs(log_dir)
     if start_cycle <= 0:
         start_cycle = 0
+
     if end_cycle >= len(test_case_data)-1:
         end_cycle = len(test_case_data)
     ## check for max cycle and end_cycle and set end_cycle to max if it is larger than max
@@ -58,29 +60,35 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
     log_file_test_cases = open(log_dir+"/sorted_test_case.csv", "a")
     log_file.write("timestamp,mode,algo,model_name,episodes,steps,cycle_id,training_time,testing_time,winsize,test_cases,failed_test_cases, apfd, nrpa, random_apfd, optimal_apfd" + os.linesep)
     first_round: bool = True
+    if start_cycle > 0:
+        first_round = False
+        previous_model_path = model_path + "/" + mode + "_" + algo + dataset_name + "_" + str(
+            0) + "_" + str(start_cycle-1)
     model_save_path = None
     apfds=[]
     nrpas=[]
     for i in range(start_cycle, end_cycle - 1):
-        if test_case_data[i].get_test_cases_count() < 6: #or test_case_data[i].get_failed_test_cases_count() < 1:
+        if (test_case_data[i].get_test_cases_count() < 6) or \
+                ( (conf.dataset_type == "simple") and
+                  (test_case_data[i].get_failed_test_cases_count() < 1)):
             continue
         if mode.upper() == 'PAIRWISE':
             N = test_case_data[i].get_test_cases_count()
-            steps = int(episodes * ((N * (N-1))/2))
+            steps = int(episodes * (N * (math.log(N,2)+1)))
             env = CIPairWiseEnv(test_case_data[i], conf)
         elif mode.upper() == 'POINTWISE':
             N = test_case_data[i].get_test_cases_count()
-            steps = int(episodes) * N
+            steps = int(episodes * (N * (math.log(N,2)+1)))
             env = CIPointWiseEnv(test_case_data[i], conf)
         elif mode.upper() == 'LISTWISE':
             conf.max_test_cases_count = get_max_test_cases_count(test_case_data)
             N = test_case_data[i].get_test_cases_count()
-            steps = int(episodes) * get_max_test_cases_count(test_case_data)
+            steps = int(episodes * (N * (math.log(N,2)+1)))
             env = CIListWiseEnv(test_case_data[i], conf)
         elif mode.upper() == 'LISTWISE2':
             conf.max_test_cases_count = get_max_test_cases_count(test_case_data)
             N = test_case_data[i].get_test_cases_count()
-            steps = int(episodes) * get_max_test_cases_count(test_case_data)
+            steps = int(episodes * (N * (math.log(N,2)+1)))
             env = CIListWiseEnvMultiAction(test_case_data[i], conf)
         print("Training agent with replaying of cycle " + str(i) + " with steps " + str(steps))
 
@@ -106,8 +114,10 @@ def experiment(mode, algo, test_case_data, start_cycle, end_cycle, episodes, mod
             training_end_time = datetime.now()
         print("Training agent with replaying of cycle " + str(i) + " is finished")
 
-        j = i+1
-        while (test_case_data[j].get_test_cases_count() < 6 )  and j < end_cycle:
+        j = i+1 ## test trained agent on next cycles
+        while (((test_case_data[j].get_test_cases_count() < 6)
+               or ((conf.dataset_type == "simple") and (test_case_data[j].get_failed_test_cases_count() == 0) ))
+               and (j < end_cycle)):
             #or test_case_data[j].get_failed_test_cases_count() == 0) \
             j = j+1
         if j >= end_cycle-1:
@@ -243,6 +253,7 @@ ci_cycle_logs = test_data_loader.pre_process()
 reportDatasetInfo(test_case_data=ci_cycle_logs)
 
 #training using n cycle staring from start cycle
+conf.dataset_type = args.dataset_type
 experiment(mode=args.mode, algo=args.algo.upper(), test_case_data=ci_cycle_logs, episodes=int(args.episodes),
            start_cycle=conf.first_cycle, verbos=False,
            end_cycle=conf.first_cycle + conf.cycle_count - 1, model_path=conf.output_path, dataset_name="", conf=conf)

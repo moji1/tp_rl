@@ -9,7 +9,7 @@ import scipy.stats as stats
 
 
 def calc_wilcoxon(sql_text1, sql_text2, result_table):
-    sqlEngine = create_engine('mysql+pymysql://root:3890nmMN!@#@127.0.0.1', pool_recycle=3600)
+    sqlEngine = create_engine('mysql+pymysql://xxx127.0.0.1', pool_recycle=3600)
     dbConnection = sqlEngine.connect()
     data1 = pd.read_sql(sql_text1, dbConnection)
     data2 = pd.read_sql(sql_text2, dbConnection)
