@@ -69,7 +69,7 @@ class CIListWiseEnv(gym.Env):
         optimal_rank = self.optimal_order.index(self.cycle_logs.test_cases[test_case_index])
         normalized_optimal_rank = optimal_rank/self.cycle_logs.get_test_cases_count()
         normalized_assigned_rank = assigned_rank / self.cycle_logs.get_test_cases_count()
-        reward = 1 - abs(normalized_assigned_rank-normalized_optimal_rank)
+        reward = 1 - (normalized_assigned_rank-normalized_optimal_rank)**2
         return reward
 
     def _calculate_reward1(self, test_case_index):

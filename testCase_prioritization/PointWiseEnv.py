@@ -56,7 +56,7 @@ class CIPointWiseEnv(gym.Env):
         test_case_prob = test_case_prob[0]
         optimal_rank= self.optimal_order.index(self.cycle_logs.test_cases[self.current_index])
         normalized_optimal_rank=optimal_rank/self.cycle_logs.get_test_cases_count()
-        reward = 1 - abs(test_case_prob-normalized_optimal_rank)
+        reward = 1 - (test_case_prob-normalized_optimal_rank)**2
         return reward
     def _calculate_reward_old1(self, test_case_prob):
         test_case_prob = test_case_prob[0]

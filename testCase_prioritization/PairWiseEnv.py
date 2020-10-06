@@ -92,11 +92,11 @@ class CIPairWiseEnv(gym.Env):
         if selected_test_case['verdict'] > no_selected_test_case['verdict']:
             reward = 1
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
-            reward = -1
+            reward = 0
         elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
-            reward = 1
+            reward = .5
         elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
-            reward = -1
+            reward = 0
         return reward
     ## simple  data set
     def _calculate_reward_simple(self, test_case_index):
@@ -109,12 +109,13 @@ class CIPairWiseEnv(gym.Env):
         if selected_test_case['verdict'] > no_selected_test_case['verdict']:
             reward = 1
         elif selected_test_case['verdict'] < no_selected_test_case['verdict']:
-            reward = -1
+            reward = 0
         elif selected_test_case['last_exec_time'] <= no_selected_test_case['last_exec_time']:
-            reward = 0
+            reward = .5
         elif selected_test_case['last_exec_time'] > no_selected_test_case['last_exec_time']:
-            reward = 0
+            reward = 1
         return reward
+
     def swapPositions(self, l, pos1, pos2):
         l[pos1], l[pos2] = l[pos2], l[pos1]
         return l
@@ -129,6 +130,7 @@ class CIPairWiseEnv(gym.Env):
     def step(self, test_case_index):
         reward = self._calculate_reward(test_case_index)
         done = False
+        ## an step of a merging sort
         if test_case_index == 1:
             self.test_cases_vector_temp.append(self.test_cases_vector[self.right])
             self.right = self.right+1
