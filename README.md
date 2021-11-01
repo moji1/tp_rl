@@ -17,7 +17,7 @@ To run the experiments, you first need to install Python 3.7 and Stable Baseline
  -t TRAIN_DATA --> Location of the training dataset
   -e EPISODES. --> the number of episodes used to train the agent
  [-d DATASET_TYPE]  --> type of the dataset that can be either simple or enriched
- [-w WIN_SIZE]      --> A number that specfies how ....
+ [-w WIN_SIZE]      --> history window
  [-f FIRST_CYCLE]   --> a cycle from which the training will be started. Each dataset contains many cycles of regression testing, and this parameter specifies the number of cycles whose logs are to be used to train the initial agent.
  [-c CYCLE_COUNT] --> How frequently the agent will be retrained, e.g., one means that the agent will be retrained after each CI cycle.
  [-o OUTPUT_PATH] --> The path where the results and the trained agents will be saved
