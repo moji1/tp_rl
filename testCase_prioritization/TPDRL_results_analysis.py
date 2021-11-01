@@ -21,6 +21,9 @@ def process_logs(datasets, supported_formalization, supported_algo):
     accuracy_dataset_result = {"iofrol-additional-features":{}, 'paintcontrol-additional-features': {},
                     "Commons_codec": {}, "Commons_io": {}, "Commons_imaging": {},
                    "Commons_compress": {}, "Commons_math": {}, "Commons_lang": {}}
+    prediction_time_dataset_result = {"iofrol-additional-features":{}, 'paintcontrol-additional-features': {},
+                    "Commons_codec": {}, "Commons_io": {}, "Commons_imaging": {},
+                   "Commons_compress": {}, "Commons_math": {}, "Commons_lang": {}}
     training_time_dataset_result = {"iofrol-additional-features":{}, 'paintcontrol-additional-features': {},
                     "Commons_codec": {}, "Commons_io": {}, "Commons_imaging": {},
                    "Commons_compress": {}, "Commons_math": {}, "Commons_lang": {}}
@@ -46,6 +49,16 @@ def process_logs(datasets, supported_formalization, supported_algo):
                              "SAC": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
                              "TD3": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
                              "TRPO": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}}}
+    prediction_time_summary = {"A2C": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "ACER":  {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "ACKTR":  {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "DDPG":  {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "DQN": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "PPO1": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "PPO2": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "SAC": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "TD3": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}},
+                             "TRPO": {"PAIRWISE": {},"POINTWISE": {},"LISTWISE": {}}}
     for dataset_type in datasets.keys():
         for dataset in datasets[dataset_type]:
             for mode in supported_formalization:
@@ -59,11 +72,19 @@ def process_logs(datasets, supported_formalization, supported_algo):
                             data.rename(columns=lambda x: x.strip(), inplace=True)
                             #print(log_file_path)
                             training_times = data["training_time"]
+                            prediction_times = data["testing_time"]
                             training_times_sum = training_times.sum()
+                            prediction_times_sum = prediction_times.sum()
                             if not (dataset in training_time_summary[algo][mode].keys()):
                                 training_time_summary[algo][mode][dataset] = {}
+                                prediction_time_summary[algo][mode][dataset] = {}
                             training_time_summary[algo][mode][dataset]['sum'] = training_times_sum/(1000*60)
                             training_time_dataset_result[dataset][mode + "-" + algo] = training_times
+                            prediction_time_summary[algo][mode][dataset]['sum'] = prediction_times_sum/(1000*60)
+                            prediction_time_summary[algo][mode][dataset]['mean'] = prediction_times.mean(skipna=True)
+                            prediction_time_summary[algo][mode][dataset]['std'] = prediction_times.std(skipna=True)
+                            prediction_time_summary[algo][mode][dataset]['max'] = prediction_times.max(skipna=True)
+                            prediction_time_dataset_result[dataset][mode + "-" + algo] = prediction_times
                             if not (dataset in accuracy_summary[algo][mode].keys()):
                                 accuracy_summary[algo][mode][dataset] = {}
                             if (dataset_type=="simple"):
@@ -86,7 +107,8 @@ def process_logs(datasets, supported_formalization, supported_algo):
                         result = f"{log_file_path}: logs is not availabe yet"
                         print(result)
 
-    return accuracy_dataset_result, accuracy_summary,training_time_dataset_result,training_time_summary
+    return accuracy_dataset_result, accuracy_summary,training_time_dataset_result, \
+           training_time_summary, prediction_time_dataset_result, prediction_time_summary
 
 def anova_analysis(df, reverse=True): # df is a melted dataframe
     aov = pg.welch_anova(dv='value', between='variable', data=df)
@@ -174,6 +196,35 @@ def latex_training(algo_mode, datasets, training_time_summary):
         latex_text += f"\\hline \n"
     return  latex_text
 
+def latex_prediction(algo_mode, datasets, prediction_time_summary):
+    latex_text = f""
+    for algo in algo_mode.keys():
+        latex_text += f"\multirow{{{len(algo_mode[algo])}}}{{.40cm}}{{\small \\textbf{{{algo}}}}} "
+        for mode in algo_mode[algo]:
+            latex_text=latex_text+ f"& \small \\textbf{{{mode[0]+mode[1]}}} "
+            for dataset_type in datasets.keys():
+                for dataset in datasets[dataset_type]:
+                    if not dataset in prediction_time_summary[algo][mode].keys():
+                        prediction_time_summary[algo][mode][dataset] = {}
+                        prediction_time_summary[algo][mode][dataset]['sum'] = 0
+                        prediction_time_summary[algo][mode][dataset]['mean'] = 0
+                        prediction_time_summary[algo][mode][dataset]['std'] = 0
+                        prediction_time_summary[algo][mode][dataset]['rank'] = 0
+                    if prediction_time_summary[algo][mode][dataset]['mean']/1000 < 2:
+                        latex_text += f"& \small  {prediction_time_summary[algo][mode][dataset]['mean']/1000:.2f}$\pm$" \
+                                  f"{prediction_time_summary[algo][mode][dataset]['std']/1000:.2f}" \
+                                  f"\\circled{{{prediction_time_summary[algo][mode][dataset]['rank']}}} "
+                    else:
+                        latex_text += f"& \small  {prediction_time_summary[algo][mode][dataset]['mean']/1000:.2f}$\pm$"
+                        if prediction_time_summary[algo][mode][dataset]['std']/1000 < 2:
+                            latex_text += f"{prediction_time_summary[algo][mode][dataset]['std']/1000:.2f}"
+                        else:
+                            latex_text += f"{prediction_time_summary[algo][mode][dataset]['std'] / 1000:.2f}"
+                        latex_text += f"\\circled{{{prediction_time_summary[algo][mode][dataset]['rank']}}} "
+            latex_text = latex_text + f"\\\\ \n"
+        latex_text += f"\\hline \n"
+    return  latex_text
+
 def calc_ttest(data1, data2):
 
     ttest = stats.ttest_ind(data1, data2, equal_var=False)
@@ -223,14 +274,15 @@ if __name__ == '__main__':
                     "Commons_codec": 177, "Commons_io": 175, "Commons_imaging": 145,
                    "Commons_compress": 436, "Commons_math": 54, "Commons_lang": 299}
 
-    accuracy_dataset_result, accuracy_summary, training_time_dataset_result, training_time_summary = process_logs(datasets,supported_formalization,supported_algo)
+    accuracy_dataset_result, accuracy_summary, training_time_dataset_result, \
+    training_time_summary, prediction_time_dataset_result, prediction_time_summary = process_logs(datasets,supported_formalization,supported_algo)
     #data=pd.DataFrame(accuracy_dataset_result["Commons_codec"])
     #RQ1
     ## anova analysis for eachdata set
     ## Generate Accuracy  Table
     ## Generate Training time Table
 
-    best_worst_config_latex=f"" ## CLE table latex
+    best_worst_config_latex = f"" ## CLE table latex
     for dataset_type in datasets.keys():
         for dataset in datasets[dataset_type]:
             ## accuracy analysis
@@ -250,6 +302,14 @@ if __name__ == '__main__':
                 mode = temp[0]
                 algo = temp[1]
                 training_time_summary[algo][mode][dataset]["rank"] = config_ranks[config]
+            ## prediction time analysis
+            data = pd.DataFrame(prediction_time_dataset_result[dataset])
+            config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data), reverse=False)
+            for config in config_ranks:
+                temp = config.split("-")
+                mode = temp[0]
+                algo = temp[1]
+                prediction_time_summary[algo][mode][dataset]["rank"] = config_ranks[config]
 
     #generate_latex_table_accuracy(accuracy_summary)
     latex_accuracy_text = latex_accuracy(algo_mode,datasets,accuracy_summary)
@@ -261,6 +321,10 @@ if __name__ == '__main__':
     latex_training_text = latex_training(algo_mode, datasets, training_time_summary)
     print(latex_training_text)
     print("\n\n")
+    print("Table for prediction time: \n")
+    latex_prediction_text = latex_prediction(algo_mode, datasets, prediction_time_summary)
+    print(latex_prediction_text)
+    print("\n\n")
     print("Table for best-worst cle:\n")
     print(best_worst_config_latex)
 
@@ -269,17 +333,21 @@ if __name__ == '__main__':
     shared_algos = ["PPO1", "PPO2", "TRPO", "A2C"]
     shared_algo_accuracy_result = {"PAIRWISE": [], "POINTWISE": [], "LISTWISE": []}
     shared_algo_train_time_result = {"PAIRWISE": [], "POINTWISE": [], "LISTWISE": []}
+    shared_algo_prediction_time_result = {"PAIRWISE": [], "POINTWISE": [], "LISTWISE": []}
     #shared_algo_simple_result= prepare_resuts_of_shared_algo(accuracy_dataset_result)
     for dataset_type in datasets.keys():
         for share_algo in shared_algos:
             shared_algo_accuracy_result = {"PAIRWISE": [], "POINTWISE": [], "LISTWISE": []}
             shared_algo_train_time_result = {"PAIRWISE": [], "POINTWISE": [], "LISTWISE": []}
+            shared_algo_prediction_time_result = {"PAIRWISE": [], "POINTWISE": [], "LISTWISE": []}
             for dataset in datasets[dataset_type]:
                 for mode in supported_formalization:
                     if mode+"-"+share_algo in accuracy_dataset_result[dataset].keys():
                         shared_algo_accuracy_result[mode] += (accuracy_dataset_result[dataset][mode+"-"+share_algo].tolist())
                         shared_algo_train_time_result[mode] += (
                             training_time_dataset_result[dataset][mode + "-" + share_algo].tolist())
+                        shared_algo_prediction_time_result[mode] += (
+                            prediction_time_dataset_result[dataset][mode + "-" + share_algo].tolist())
 
             if  (len(shared_algo_accuracy_result["PAIRWISE"]) == len(shared_algo_accuracy_result["LISTWISE"]) and
                 len(shared_algo_accuracy_result["PAIRWISE"]) == len(shared_algo_accuracy_result["POINTWISE"]) ) :
@@ -290,6 +358,10 @@ if __name__ == '__main__':
                 data = pd.DataFrame(shared_algo_train_time_result)
                 config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data),  reverse=False)
                 results = f"Training Time: {share_algo}:{dataset_type} pvalue={aov_pval}, max_cle={max_CLE}, Rankes:{config_ranks}"
+                print(results)
+                data = pd.DataFrame(shared_algo_prediction_time_result)
+                config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data),  reverse=False)
+                results = f"Prediction Time: {share_algo}:{dataset_type} pvalue={aov_pval}, max_cle={max_CLE}, Rankes:{config_ranks}"
                 print(results)
 
 
@@ -303,24 +375,29 @@ if __name__ == '__main__':
         for mode in supported_formalization:
             results_algo_accuracy = {}
             results_algo_training = {}
+            results_algo_prediction = {}
             for algo in supported_algo[mode]:
                 for dataset in datasets[dataset_type]:
                     if not algo in results_algo_accuracy:
                         results_algo_accuracy[algo] = []
                         results_algo_training[algo] = []
+                        results_algo_prediction[algo] = []
                     if mode + "-" + algo in accuracy_dataset_result[dataset].keys():
                         results_algo_accuracy[algo] += (accuracy_dataset_result[dataset][mode + "-" + algo].tolist())
                         results_algo_training[algo] += (training_time_dataset_result[dataset][mode + "-" + algo].tolist())
-
+                        results_algo_prediction[algo] += (prediction_time_dataset_result[dataset][mode + "-" + algo].tolist())
 
             data = pd.DataFrame(results_algo_accuracy)
             config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data), reverse=True)
             results = f"Accuracy: {mode}-{dataset_type} pvalue={aov_pval}, max_cle={max_CLE} Rankes:{config_ranks}"
             print(results)
             data = pd.DataFrame(results_algo_training)
-            config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data),
-                                                                                        reverse=False)
+            config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data),                                                                            reverse=False)
             results = f"Training Time: {mode}-{dataset_type} pvalue={aov_pval}, max_cle={max_CLE}, Rankes:{config_ranks}"
+            print(results)
+            data = pd.DataFrame(results_algo_prediction)
+            config_ranks, aov_pval, best_config, worst_config, max_CLE = anova_analysis(pd.melt(data),                                                                            reverse=False)
+            results = f"Prediction Time: {mode}-{dataset_type} pvalue={aov_pval}, max_cle={max_CLE}, Rankes:{config_ranks}"
             print(results)
 
     ### RQ2

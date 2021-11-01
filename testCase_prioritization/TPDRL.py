@@ -248,13 +248,12 @@ if __name__ == '__main__':
 test_data_loader = TestCaseExecutionDataLoader(conf.train_data, args.dataset_type)
 test_data = test_data_loader.load_data()
 ci_cycle_logs = test_data_loader.pre_process()
-### open data
 
+### load data
 reportDatasetInfo(test_case_data=ci_cycle_logs)
 
-#training using n cycle staring from start cycle
+#training using n cycle staring from first cycle
 conf.dataset_type = args.dataset_type
 experiment(mode=args.mode, algo=args.algo.upper(), test_case_data=ci_cycle_logs, episodes=int(args.episodes),
            start_cycle=conf.first_cycle, verbos=False,
            end_cycle=conf.first_cycle + conf.cycle_count - 1, model_path=conf.output_path, dataset_name="", conf=conf)
-# .. lets test this tommorow by passing args
