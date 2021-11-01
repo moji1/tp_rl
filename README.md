@@ -26,7 +26,7 @@ To run the experiments, you first need to install Python 3.7 and Stable Baseline
 ### An Example.
 `python testCase_prioritization/TPDRL.py -m pointwise -a ACKTR -t ../data/iofrol-additional-features.csv -e 200 -w 10 -d simple`
 
-Train an EL agent using ACKTR algorithm based on pointwise ranking for dataset `iofrol`. 
+The above command starts training of an RL agent using ACKTR algorithm and pointwise ranking based on dataset `iofrol`. 
 
 
 
